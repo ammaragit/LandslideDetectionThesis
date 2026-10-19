@@ -1,0 +1,6 @@
+ABLATION STUDY
+===========================================================================
+CM1 vs CM2                              -0.68%     -1.08%     +0.04%   # Value of attention in naive fusion
+CM2 vs M1                                  N/A        N/A        N/A   # Value of SCCA cross-modal attention
+M1  vs M2                                  N/A        N/A        N/A   # Contribution of RO1 temporal encoding
+M2  vs M3                                  N/A        N/A        N/A   # Contribution of RO2 uncertainty module

@@ -1,0 +1,7 @@
+L4S Spectral Indices Results
+================================================================================
+CM1 — Concat U-Net: IoU=76.33  F1=70.16  Prec=67.26  Rec=73.32  ECE=0.95
+CM2 — Attention U-Net: IoU=75.64  F1=69.08  Prec=64.12  Rec=74.88  ECE=0.98
+M1 — HAEFNet: IoU=75.52  F1=68.81  Prec=67.03  Rec=70.69  ECE=0.80
+M2 — HAEFNet + RO1: IoU=75.53  F1=68.83  Prec=66.73  Rec=71.07  ECE=0.82
+M3 — Proposed (RO1+RO2): IoU=75.32  F1=68.55  Prec=63.23  Rec=74.85  ECE=0.94

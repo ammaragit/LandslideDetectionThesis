@@ -1,0 +1,12 @@
+TIME COMPLEXITY ANALYSIS
+======================================================================
+Model                               Params (M)   Inference (ms)      Std
+----------------------------------------------------------------------
+CM1 — Concat U-Net                      31.39M         13.41ms ±  0.46ms
+CM2 — Attention U-Net                   81.65M         28.43ms ±  0.09ms
+M1 — HAEFNet [1]                        38.32M        142.97ms ± 17.56ms
+M2 — HAEFNet + RO1                      38.32M        132.54ms ±  2.39ms
+M3 — Proposed                           38.96M        134.74ms ±  1.17ms
+
+Device: cuda
+Patch size: 128x128 | Batch: 1 | Runs: 50

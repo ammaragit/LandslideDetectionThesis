@@ -1,0 +1,44 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+
+# Local environments and credentials
+.venv/
+venv/
+env/
+.env
+.env.*
+
+# Datasets and downloaded/preprocessed data
+/data/
+/Landslide4Sense/
+*.nc
+*.h5
+*.npz
+*.tif
+*.tiff
+*.tar.gz
+
+# Model weights and training outputs
+/checkpoints/
+/pretrained/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+/logs/
+/runs/
+/work_dir/
+/demo_output/
+/split_*_debug*.txt
+
+# Temporary files
+.cache/
+*.log
+*.tmp
+*.bak
+
+# Local editor and operating-system files
+/.vscode/settings.json
+.DS_Store
+Thumbs.db

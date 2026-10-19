@@ -1,0 +1,205 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# Landslide4Sense Configuration
+# Runs all models on Landslide4Sense as cross-dataset validation
+# Uses same global hyperparameters as Sen12Landslides for fair comparison
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Global parameters (identical to Sen12Landslides for fair comparison) ───────
+global_training:
+  batch_size: 8
+  num_epochs: 50
+  num_workers: 2
+  save_interval: 5
+  learning_rate: 1.0e-05
+  weight_decay: 0.05
+  scheduler:
+    type: cos
+    T_max: 100000
+    eta_min: 1.0e-6
+    warmup_iterations: 500
+    warmup_ratio: 1.0e-6
+  early_stopping:
+    patience: 10
+    min_delta: 0.1
+  loss:
+    type: composite
+    task:
+      name: ce_dice
+      ce_weight: 1.0
+      dice_weight: 3.0
+      class_weights: [0.1, 0.9]
+    modal:
+      weight: 0.5
+    uncertainty:
+      target: 0.3
+      weight: 0.01
+    beta_reg:
+      weight: 0.0005
+    fuse_consistency:
+      weight: 0.02
+    ignore_index: 255
+  loss_weights:
+    head: 0.0
+
+# ── Dataset ────────────────────────────────────────────────────────────────────
+data:
+  root_dir: "E:/thesis/huggingfaceread/HAEFNet-main/Landslide4Sense"
+  train_list: l4s_train_list.txt
+  max_samples: null       # set to 150 for debug run first
+  split:
+    train_ratio: 0.70
+    val_ratio: 0.10
+    test_ratio: 0.20
+    seed: 3407
+
+modalities:
+  use_dem: true
+  use_insar_vel: true   # mapped to NIR+SWIR bands (B8, B11, B12)
+  use_rgb: true         # mapped to RGB bands (B4, B3, B2)
+
+# ── Shared normalization (data already normalized to [0,1] in preprocessing) ───
+model_norms: &model_norms
+  dem:
+    mean: 0.5
+    std: 0.5
+    min: 0.0
+    max: 1.0
+  insar_vel:
+    mean: 0.5
+    std: 0.5
+    min: 0.0
+    max: 1.0
+  rgb:
+    band1:
+      mean: 0.5
+      std: 0.5
+      min: 0.0
+      max: 1.0
+    band2:
+      mean: 0.5
+      std: 0.5
+      min: 0.0
+      max: 1.0
+    band3:
+      mean: 0.5
+      std: 0.5
+      min: 0.0
+      max: 1.0
+
+# ── CM1 ────────────────────────────────────────────────────────────────────────
+cm1:
+  model:
+    type: concat_unet
+    in_channels: 9
+    num_classes: 2
+    base_channels: 64
+    modality_norms: *model_norms
+  training:
+    ckpt_dir: checkpoints/l4s/
+    task_name: l4s_cm1
+    log_dir: logs/l4s/CM1
+
+# ── CM2 ────────────────────────────────────────────────────────────────────────
+cm2:
+  model:
+    type: attention_unet
+    sar_channels: 3
+    opt_channels: 3
+    dem_channels: 3
+    num_classes: 2
+    base_channels: 32
+    modality_norms: *model_norms
+  training:
+    ckpt_dir: checkpoints/l4s/
+    task_name: l4s_cm2
+    log_dir: logs/l4s/CM2
+
+# ── M1 — HAEFNet baseline ──────────────────────────────────────────────────────
+m1:
+  model:
+    type: haefnet
+    backbone: swin_tiny
+    pretrained: true
+    pretrained_backbone_path: "pretrained/swin_tiny_fixed.pth"
+    num_classes: 2
+    num_modalities: 3
+    modality_dims:
+      dem: 3
+      insar_vel: 3
+      rgb: 3
+    modality_norms: *model_norms
+    use_evidential_fusion: true
+    use_mrg: true
+    use_aux_head: false
+    n_heads: 8
+    drop_path_rate: 0.2
+    drop_rate: 0.0
+    gem_geo_prior_weight: 0
+    gem_prototype_dim: 20
+    prob_fusion: product
+  training:
+    ckpt_dir: checkpoints/l4s/
+    task_name: l4s_m1
+    log_dir: logs/l4s/M1
+
+# ── M2 — HAEFNet + NIR/SWIR change features (RO1 adapted) ──────────────────────
+# Note: No true temporal SAR available in L4S. NIR+SWIR bands serve as
+# surface-sensitive optical proxy for the SAR change slot.
+m2:
+  model:
+    type: haefnet
+    backbone: swin_tiny
+    pretrained: true
+    pretrained_backbone_path: "pretrained/swin_tiny_fixed.pth"
+    num_classes: 2
+    num_modalities: 3
+    modality_dims:
+      dem: 3
+      insar_vel: 3
+      rgb: 3
+    modality_norms: *model_norms
+    use_evidential_fusion: true
+    use_mrg: true
+    use_aux_head: false
+    n_heads: 8
+    drop_path_rate: 0.2
+    drop_rate: 0.0
+    gem_geo_prior_weight: 0
+    gem_prototype_dim: 20
+    prob_fusion: product
+  training:
+    ckpt_dir: checkpoints/l4s/
+    task_name: l4s_m2
+    log_dir: logs/l4s/M2
+
+# ── M3 — Full proposed model ────────────────────────────────────────────────────
+m3:
+  model:
+    type: haefnet_proposed
+    backbone: swin_tiny
+    pretrained: true
+    pretrained_backbone_path: "pretrained/swin_tiny_fixed.pth"
+    num_classes: 2
+    num_modalities: 3
+    modality_dims:
+      dem: 3
+      insar_vel: 3
+      rgb: 3
+    modality_norms: *model_norms
+    use_evidential_fusion: true
+    use_mrg: true
+    use_aux_head: false
+    use_uncertainty_module: true
+    uncertainty_method: mcdropout
+    mc_samples: 10
+    n_heads: 8
+    drop_path_rate: 0.2
+    drop_rate: 0.1
+    gem_geo_prior_weight: 0
+    gem_prototype_dim: 20
+    prob_fusion: product
+  training:
+    ckpt_dir: checkpoints/l4s/
+    task_name: l4s_m3
+    log_dir: logs/l4s/M3
+    learning_rate: 1.5e-05

@@ -1,0 +1,337 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# Landslide4Sense Configuration — Paper 2 (v2)
+# Three preprocessing modes, each gets its own root_dir
+#
+# Run with:
+#   python train.py --config configs/l4s_config_v2.yml --model <key>
+#
+# Model keys available:
+#   Baseline (raw bands):      cm1_raw, cm2_raw, m1_raw, m2_raw, m3_raw
+#   Proposed (indices):        cm1_idx, cm2_idx, m1_idx, m2_idx, m3_idx
+#   Alternative (dem feats):   cm1_dem, cm2_dem, m1_dem, m2_dem, m3_dem
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Global hyperparameters (shared across ALL experiments) ─────────────────────
+global_training: &global_training
+  batch_size: 8
+  num_epochs: 50
+  num_workers: 2
+  save_interval: 5
+  learning_rate: 1.0e-05
+  weight_decay: 0.05
+  scheduler:
+    type: cos
+    T_max: 100000
+    eta_min: 1.0e-6
+    warmup_iterations: 500
+    warmup_ratio: 1.0e-6
+  early_stopping:
+    patience: 10
+    min_delta: 0.1
+  loss:
+    type: composite
+    task:
+      name: ce_dice
+      ce_weight: 1.0
+      dice_weight: 3.0
+      class_weights: [0.1, 0.9]
+    modal:
+      weight: 0.3
+    uncertainty:
+      target: 0.3
+      weight: 0.005
+    beta_reg:
+      weight: 0.0001
+    fuse_consistency:
+      weight: 0.01
+    ignore_index: 255
+  loss_weights:
+    head: 0.0
+
+# ── Shared modality config ─────────────────────────────────────────────────────
+modalities: &modalities
+  use_dem: true
+  use_insar_vel: true
+  use_rgb: true
+
+# ── Shared normalization ───────────────────────────────────────────────────────
+model_norms: &model_norms
+  dem:
+    mean: 0.5
+    std: 0.5
+  insar_vel:
+    mean: 0.5
+    std: 0.5
+  rgb:
+    band1: {mean: 0.5, std: 0.5}
+    band2: {mean: 0.5, std: 0.5}
+    band3: {mean: 0.5, std: 0.5}
+
+# ── Root dir anchors (one per preprocessing mode) ──────────────────────────────
+data_raw: &data_raw
+  root_dir: "E:/thesis/huggingfaceread/HAEFNet-main/Landslide4Sense/preprocessed_raw"
+  max_samples: null
+  split: {train_ratio: 0.70, val_ratio: 0.10, test_ratio: 0.20, seed: 3407}
+
+data_idx: &data_idx
+  root_dir: "E:/thesis/huggingfaceread/HAEFNet-main/Landslide4Sense/preprocessed_indices"
+  max_samples: null
+  split: {train_ratio: 0.70, val_ratio: 0.10, test_ratio: 0.20, seed: 3407}
+
+data_dem: &data_dem
+  root_dir: "E:/thesis/huggingfaceread/HAEFNet-main/Landslide4Sense/preprocessed_dem_features"
+  max_samples: null
+  split: {train_ratio: 0.70, val_ratio: 0.10, test_ratio: 0.20, seed: 3407}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EXPERIMENT GROUP 1 — RAW BANDS (controlled baseline, expected non-convergence)
+# ══════════════════════════════════════════════════════════════════════════════
+cm1_raw:
+  data: *data_raw
+  modalities: *modalities
+  model:
+    type: concat_unet
+    in_channels: 9
+    num_classes: 2
+    base_channels: 64
+    modality_norms: *model_norms
+  training:
+    <<: *global_training
+    ckpt_dir: checkpoints/l4s_raw/
+    task_name: l4s_raw_cm1
+    log_dir: logs/l4s_raw/CM1
+
+cm2_raw:
+  data: *data_raw
+  modalities: *modalities
+  model:
+    type: attention_unet
+    sar_channels: 3
+    opt_channels: 3
+    dem_channels: 3
+    num_classes: 2
+    base_channels: 32
+    modality_norms: *model_norms
+  training:
+    <<: *global_training
+    ckpt_dir: checkpoints/l4s_raw/
+    task_name: l4s_raw_cm2
+    log_dir: logs/l4s_raw/CM2
+
+m1_raw:
+  data: *data_raw
+  modalities: *modalities
+  model:
+    type: haefnet
+    backbone: swin_tiny
+    pretrained: true
+    pretrained_backbone_path: "pretrained/swin_tiny_fixed.pth"
+    num_classes: 2
+    num_modalities: 3
+    modality_dims: {dem: 3, insar_vel: 3, rgb: 3}
+    modality_norms: *model_norms
+    use_evidential_fusion: true
+    use_mrg: true
+    n_heads: 8
+    drop_path_rate: 0.2
+    gem_geo_prior_weight: 0
+    gem_prototype_dim: 20
+    prob_fusion: product
+  training:
+    <<: *global_training
+    ckpt_dir: checkpoints/l4s_raw/
+    task_name: l4s_raw_m1
+    log_dir: logs/l4s_raw/M1
+
+m3_raw:
+  data: *data_raw
+  modalities: *modalities
+  model:
+    type: haefnet_proposed
+    backbone: swin_tiny
+    pretrained: true
+    pretrained_backbone_path: "pretrained/swin_tiny_fixed.pth"
+    num_classes: 2
+    num_modalities: 3
+    modality_dims: {dem: 3, insar_vel: 3, rgb: 3}
+    modality_norms: *model_norms
+    use_evidential_fusion: true
+    use_mrg: true
+    use_uncertainty_module: true
+    uncertainty_method: mcdropout
+    mc_samples: 10
+    n_heads: 8
+    drop_path_rate: 0.2
+    drop_rate: 0.1
+    gem_geo_prior_weight: 0
+    gem_prototype_dim: 20
+    prob_fusion: product
+  training:
+    <<: *global_training
+    ckpt_dir: checkpoints/l4s_raw/
+    task_name: l4s_raw_m3
+    log_dir: logs/l4s_raw/M3
+    learning_rate: 8.0e-06
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EXPERIMENT GROUP 2 — SPECTRAL INDICES (proposed fix: NDVI/NDWI/NBR)
+# ══════════════════════════════════════════════════════════════════════════════
+cm1_idx:
+  data: *data_idx
+  modalities: *modalities
+  model:
+    type: concat_unet
+    in_channels: 9
+    num_classes: 2
+    base_channels: 64
+    modality_norms: *model_norms
+  training:
+    <<: *global_training
+    ckpt_dir: checkpoints/l4s_indices/
+    task_name: l4s_idx_cm1
+    log_dir: logs/l4s_indices/CM1
+
+cm2_idx:
+  data: *data_idx
+  modalities: *modalities
+  model:
+    type: attention_unet
+    sar_channels: 3
+    opt_channels: 3
+    dem_channels: 3
+    num_classes: 2
+    base_channels: 32
+    modality_norms: *model_norms
+  training:
+    <<: *global_training
+    ckpt_dir: checkpoints/l4s_indices/
+    task_name: l4s_idx_cm2
+    log_dir: logs/l4s_indices/CM2
+
+m1_idx:
+  data: *data_idx
+  modalities: *modalities
+  model:
+    type: haefnet
+    backbone: swin_tiny
+    pretrained: true
+    pretrained_backbone_path: "pretrained/swin_tiny_fixed.pth"
+    num_classes: 2
+    num_modalities: 3
+    modality_dims: {dem: 3, insar_vel: 3, rgb: 3}
+    modality_norms: *model_norms
+    use_evidential_fusion: true
+    use_mrg: true
+    n_heads: 8
+    drop_path_rate: 0.2
+    gem_geo_prior_weight: 0
+    gem_prototype_dim: 20
+    prob_fusion: product
+  training:
+    <<: *global_training
+    ckpt_dir: checkpoints/l4s_indices/
+    task_name: l4s_idx_m1
+    log_dir: logs/l4s_indices/M1
+
+m3_idx:
+  data: *data_idx
+  modalities: *modalities
+  model:
+    type: haefnet_proposed
+    backbone: swin_tiny
+    pretrained: true
+    pretrained_backbone_path: "pretrained/swin_tiny_fixed.pth"
+    num_classes: 2
+    num_modalities: 3
+    modality_dims: {dem: 3, insar_vel: 3, rgb: 3}
+    modality_norms: *model_norms
+    use_evidential_fusion: true
+    use_mrg: true
+    use_uncertainty_module: true
+    uncertainty_method: mcdropout
+    mc_samples: 10
+    n_heads: 8
+    drop_path_rate: 0.2
+    drop_rate: 0.1
+    gem_geo_prior_weight: 0
+    gem_prototype_dim: 20
+    prob_fusion: product
+  training:
+    <<: *global_training
+    ckpt_dir: checkpoints/l4s_indices/
+    task_name: l4s_idx_m3
+    log_dir: logs/l4s_indices/M3
+    learning_rate: 8.0e-06
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EXPERIMENT GROUP 3 — DEM FEATURES (alternative: slope/aspect/curvature)
+# ══════════════════════════════════════════════════════════════════════════════
+cm1_dem:
+  data: *data_dem
+  modalities: *modalities
+  model:
+    type: concat_unet
+    in_channels: 9
+    num_classes: 2
+    base_channels: 64
+    modality_norms: *model_norms
+  training:
+    <<: *global_training
+    ckpt_dir: checkpoints/l4s_dem_features/
+    task_name: l4s_dem_cm1
+    log_dir: logs/l4s_dem_features/CM1
+
+m1_dem:
+  data: *data_dem
+  modalities: *modalities
+  model:
+    type: haefnet
+    backbone: swin_tiny
+    pretrained: true
+    pretrained_backbone_path: "pretrained/swin_tiny_fixed.pth"
+    num_classes: 2
+    num_modalities: 3
+    modality_dims: {dem: 3, insar_vel: 3, rgb: 3}
+    modality_norms: *model_norms
+    use_evidential_fusion: true
+    use_mrg: true
+    n_heads: 8
+    drop_path_rate: 0.2
+    gem_geo_prior_weight: 0
+    gem_prototype_dim: 20
+    prob_fusion: product
+  training:
+    <<: *global_training
+    ckpt_dir: checkpoints/l4s_dem_features/
+    task_name: l4s_dem_m1
+    log_dir: logs/l4s_dem_features/M1
+
+m3_dem:
+  data: *data_dem
+  modalities: *modalities
+  model:
+    type: haefnet_proposed
+    backbone: swin_tiny
+    pretrained: true
+    pretrained_backbone_path: "pretrained/swin_tiny_fixed.pth"
+    num_classes: 2
+    num_modalities: 3
+    modality_dims: {dem: 3, insar_vel: 3, rgb: 3}
+    modality_norms: *model_norms
+    use_evidential_fusion: true
+    use_mrg: true
+    use_uncertainty_module: true
+    uncertainty_method: mcdropout
+    mc_samples: 10
+    n_heads: 8
+    drop_path_rate: 0.2
+    drop_rate: 0.1
+    gem_geo_prior_weight: 0
+    gem_prototype_dim: 20
+    prob_fusion: product
+  training:
+    <<: *global_training
+    ckpt_dir: checkpoints/l4s_dem_features/
+    task_name: l4s_dem_m3
+    log_dir: logs/l4s_dem_features/M3
+    learning_rate: 8.0e-06

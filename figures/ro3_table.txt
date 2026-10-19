@@ -1,0 +1,13 @@
+RO3 — CROSS-REGIONAL GENERALIZATION RESULTS
+=====================================================================================
+Held-out Region      Model                              IoU      F1    Prec     Rec     ECE
+-------------------------------------------------------------------------------------
+chimanimani          M1 — HAEFNet [1]                53.98%  16.91%  20.73%  14.28%   1.22%
+chimanimani          M3 — Proposed (RO1+RO2)         53.38%  15.38%  15.01%  15.76%   1.53%
+
+hiroshima            M1 — HAEFNet [1]                56.98%  26.34%  30.04%  23.45%   0.92%
+hiroshima            M3 — Proposed (RO1+RO2)         56.80%  25.82%  29.36%  23.03%   0.91%
+
+indonesia            M1 — HAEFNet [1]                50.90%   7.51%  22.02%   4.53%   1.82%
+indonesia            M3 — Proposed (RO1+RO2)         50.04%   4.21%  16.63%   2.41%   1.91%
+
